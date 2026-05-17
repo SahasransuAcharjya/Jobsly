@@ -1,8 +1,9 @@
-import requests
+import time
 from bs4 import BeautifulSoup
 from typing import List
 import sys
 import os
+from playwright.sync_api import sync_playwright
 
 # Add parent directory to path to import models
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -10,30 +11,34 @@ from models import Job
 
 class NaukriScraper:
     def __init__(self):
-        # We need realistic headers to avoid getting blocked by basic anti-bot systems
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
+        pass
         
     def fetch_jobs(self, job_title: str) -> List[Job]:
-        print(f"Fetching Naukri jobs for: '{job_title}'...")
+        print(f"Fetching Naukri jobs for: '{job_title}' using Playwright...")
         jobs = []
         
-        # Naukri's URL structure usually looks like: https://www.naukri.com/job-title-jobs
-        # We'll format the title by replacing spaces with hyphens
         formatted_title = job_title.lower().replace(" ", "-")
         url = f"https://www.naukri.com/{formatted_title}-jobs"
         
         try:
-            response = requests.get(url, headers=self.headers, timeout=15)
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.text, "html.parser")
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                page.goto(url, wait_until="networkidle", timeout=30000)
+                
+                # Scroll slightly or wait for job cards to load if they are rendered dynamically
+                try:
+                    page.wait_for_selector(".srp-jobtuple-wrapper", timeout=10000)
+                except Exception:
+                    print("Could not find job tuples immediately, grabbing what is there.")
+                
+                html_content = page.content()
+                browser.close()
+                
+            soup = BeautifulSoup(html_content, "html.parser")
             
             # Select job cards using the identified selectors
-            job_cards = soup.select(".srp-jobtuple-wrapper, #listContainer > div[class*='job-listing-container'] > div > div")
+            job_cards = soup.select(".srp-jobtuple-wrapper, .jobTuple")
             
             for card in job_cards:
                 title_elem = card.select_one("a.title")
@@ -49,7 +54,6 @@ class NaukriScraper:
                 loc_elem = card.select_one(".locWdth")
                 location = loc_elem.get_text(strip=True) if loc_elem else "Unknown Location"
                 
-                # Try to extract a brief description if present (often in a span/div with 'job-desc' class)
                 desc_elem = card.select_one(".job-desc")
                 description = desc_elem.get_text(strip=True) if desc_elem else ""
                 
@@ -69,6 +73,12 @@ class NaukriScraper:
             print(f"Error fetching from Naukri: {e}")
             
         return jobs
+
+if __name__ == "__main__":
+    scraper = NaukriScraper()
+    found_jobs = scraper.fetch_jobs("python developer")
+    for j in found_jobs[:2]:
+        print(f"{j.title} - {j.company} ({j.location})")
 
 if __name__ == "__main__":
     scraper = NaukriScraper()
