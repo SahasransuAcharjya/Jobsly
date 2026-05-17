@@ -2,10 +2,13 @@ import requests
 from typing import List
 import sys
 import os
+from dotenv import load_dotenv
 
 # Add parent directory to path to import models
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models import Job
+
+load_dotenv()
 
 class RemoteOKScraper:
     def __init__(self):
@@ -14,6 +17,9 @@ class RemoteOKScraper:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json"
         }
+        
+        proxy_url = os.getenv("PROXY_URL")
+        self.proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
 
     def fetch_jobs(self, job_title: str) -> List[Job]:
         """
@@ -24,7 +30,7 @@ class RemoteOKScraper:
         try:
             # We can use the job_title as a tag. We might want to replace spaces with hyphens or just pass it as is.
             tag = job_title.lower().replace(" ", "-")
-            response = requests.get(f"{self.base_url}?tags={tag}", headers=self.headers, timeout=10)
+            response = requests.get(f"{self.base_url}?tags={tag}", headers=self.headers, proxies=self.proxies, timeout=10)
             response.raise_for_status()
             
             data = response.json()

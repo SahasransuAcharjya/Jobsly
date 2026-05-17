@@ -4,14 +4,17 @@ from typing import List
 import sys
 import os
 from playwright.sync_api import sync_playwright
+from dotenv import load_dotenv
 
 # Add parent directory to path to import models
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models import Job
 
+load_dotenv()
+
 class NaukriScraper:
     def __init__(self):
-        pass
+        self.proxy_url = os.getenv("PROXY_URL")
         
     def fetch_jobs(self, job_title: str) -> List[Job]:
         print(f"Fetching Naukri jobs for: '{job_title}' using Playwright...")
