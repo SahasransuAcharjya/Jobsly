@@ -25,7 +25,11 @@ class NaukriScraper:
         
         try:
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                launch_kwargs = {"headless": True}
+                if self.proxy_url:
+                    launch_kwargs["proxy"] = {"server": self.proxy_url}
+                
+                browser = p.chromium.launch(**launch_kwargs)
                 page = browser.new_page(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 page.goto(url, wait_until="networkidle", timeout=30000)
                 
